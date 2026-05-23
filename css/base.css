@@ -1,0 +1,57 @@
+/* Reset and variables */
+:root {
+  --bg: #F0EDE8;
+  --ink: #111111;
+  --neon-green: #AAFF00;
+  --neon-blue: #00F0FF;
+  --neon-pink: #FF00CC;
+  --surface: #E8E4DE;
+  --muted: #888880;
+  --font-display: 'Barlow Condensed', sans-serif;
+  --font-body: 'IBM Plex Mono', monospace;
+}
+
+* { box-sizing: border-box; }
+html,body { height: 100%; }
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Grain overlay using inlined SVG turbulence */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><filter id='n'><feTurbulence baseFrequency='0.65' numOctaves='4' type='fractalNoise'/></filter><rect width='100%' height='100%' filter='url(%23n)' /></svg>");
+  background-repeat: repeat;
+  background-size: 200px 200px;
+}
+
+/* Typography utilities */
+.site-title { font-family: var(--font-display); font-weight: 800; font-size: 52px; letter-spacing: -0.02em; text-transform: uppercase; color: var(--ink); }
+.site-sub { font-family: var(--font-display); font-weight: 700; font-size: 11px; letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; margin-top: 6px; }
+
+h1, h2, h3 { margin: 0 0 12px 0; font-family: var(--font-display); text-transform: uppercase; color: var(--ink); }
+h1 { font-weight: 800; font-size: 36px; letter-spacing: -0.01em; }
+h2 { font-weight: 700; font-size: 22px; letter-spacing: 0.05em; }
+h3 { font-weight: 700; font-size: 15px; letter-spacing: 0.12em; color: var(--muted); }
+
+p { font-family: var(--font-body); font-size: 15px; line-height: 1.75; color: var(--ink); }
+.lead { font-size: 15px; color: var(--muted); font-family: var(--font-body); }
+
+a { color: var(--neon-green); text-decoration: none; font-family: var(--font-display); font-weight: 700; }
+a:hover { text-decoration: underline; }
+
+/* Utility rules for dividers */
+.major { border: 0; border-top: 3px solid var(--ink); margin: 20px 0; }
+.minor { border: 0; border-top: 1.5px solid var(--ink); margin: 16px 0; }
+
+.meta { font-family: var(--font-display); font-weight: 700; font-size: 11px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }

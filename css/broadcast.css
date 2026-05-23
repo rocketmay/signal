@@ -1,0 +1,36 @@
+/* Chyrons, ticker, glitch, corner marks, diagonal rules */
+.chyron { display: inline-flex; font-family: var(--font-display); font-size:11px; font-weight:700; letter-spacing:0.14em; text-transform:uppercase; }
+.chyron-tag { padding:4px 8px; display:inline-block; }
+.chyron-body { padding:4px 10px; display:inline-block; background:#111; color:var(--bg); }
+.chyron .neon-green { background: var(--neon-green); color: #111; }
+.chyron .neon-blue { background: var(--neon-blue); color: #111; }
+.chyron .neon-pink { background: var(--neon-pink); color: #fff; }
+
+.ticker { position: fixed; left:0; right:0; top:0; background:#111; color:var(--neon-green); font-family:var(--font-display); font-weight:700; letter-spacing:0.18em; text-transform:uppercase; padding:6px 0; overflow:hidden; z-index:10000; }
+.ticker::before { content: ''; display:block; }
+.ticker div { display:inline-block; white-space:nowrap; }
+.ticker { display:flex; }
+.ticker > span { padding-right:40px; }
+.ticker { animation: ticker 20s linear infinite; }
+@keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+
+/* Since content is plain text, we duplicate it inside to form a loop visually */
+.ticker { will-change: transform; }
+
+/* Active nav underline handled in layout.css */
+
+/* Corner marks for other UI elements (reinforce if needed) */
+.icon-frame { position: relative; }
+.icon-frame::after, .icon-frame::before { pointer-events:none; }
+
+/* Small corner marks for key cards (CSS-only) */
+.content .card { position: relative; border:1.5px solid var(--ink); padding:12px; background:var(--surface); }
+.content .card::before, .content .card::after { content: ''; position:absolute; width:6px; height:6px; }
+
+/* Diagonal accent reduced for inner pages — override when .small header present */
+.site-header.small .diagonal-accent::after { display:none; }
+
+/* Chyron color utility classes */
+.neon-green { background: var(--neon-green); color: #111; }
+.neon-blue { background: var(--neon-blue); color: #111; }
+.neon-pink { background: var(--neon-pink); color: #fff; }
