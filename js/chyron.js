@@ -1,6 +1,7 @@
 const chyronConfig = {
   'index.html': { tag: 'LIVE', color: 'neon-pink', body: 'Competition Season 2026' },
-  'info.html': { tag: 'INFO', color: 'neon-blue', body: 'Site & Author' },
+  'base.html': { tag: 'BASE', color: 'neon-blue', body: 'Foundational basics' },
+  'about.html': { tag: 'INFO', color: 'neon-blue', body: 'Site & Author' },
   'body.html': { tag: 'BODY', color: 'neon-green', body: 'Physical Training' },
   'mind.html': { tag: 'MIND', color: 'neon-pink', body: 'Mental Skills' },
   'tech.html': { tag: 'TECH', color: 'neon-blue', body: 'Technical' },
