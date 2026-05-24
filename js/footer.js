@@ -1,6 +1,9 @@
 const footerTarget = document.getElementById('footer-include');
 if (footerTarget) {
-  fetch('footer.html')
+  const scriptUrl = document.currentScript.src;
+  const footerUrl = new URL('../footer.html', scriptUrl).href;
+
+  fetch(footerUrl)
     .then(response => response.ok ? response.text() : Promise.reject(response.status))
     .then(html => { footerTarget.innerHTML = html; })
     .catch(() => {

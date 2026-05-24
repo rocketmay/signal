@@ -90,7 +90,12 @@
 
 .content { max-width: 860px; padding: 40px 40px; margin: 0; flex: 1; }
 .item { padding: 18px 0; }
-.read-link { display:inline-block; margin-top:8px; font-family:var(--font-display); font-weight:700; color:var(--neon-green); }
+.read-link { display:inline-flex; margin-top:0; font-family:var(--font-display); font-size:0.65em; font-weight:700; color:var(--neon-pink) !important; text-decoration:none; letter-spacing:0.08em; }
+.read-link:visited { color: var(--muted-purple) !important; }
+.item .read-link:hover { color: var(--neon-blue); }
+.item h2 { display:flex; flex-wrap:wrap; align-items:center; gap:16px; }
+.item h2 a { color: var(--ink); text-decoration:none; }
+.item h2 a:hover { text-decoration: underline; }
 
 #footer-include { margin-top: auto; }
 .site-footer { display:flex; justify-content:space-between; align-items:center; padding:12px 40px; background:#111; color:var(--muted); font-family:var(--font-display); font-weight:700; }
