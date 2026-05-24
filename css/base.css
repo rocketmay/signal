@@ -6,6 +6,7 @@
   --neon-blue: #00F0FF;
   --neon-pink: #FF00CC;
   --neon-purple: #B678FF;
+  --neon-yellow: #FFF000;
   --surface: #E8E4DE;
   --muted: #525252;
   --muted-purple: #8F72B8;
@@ -52,11 +53,24 @@ h3 { font-weight: 700; font-size: 15px; letter-spacing: 0.12em; color: var(--mut
 
 p { font-family: var(--font-body); font-size: 15px; line-height: 1.75; color: var(--ink); }
 .lead { font-size: 15px; color: var(--muted); font-family: var(--font-body); }
+.article-author { display: inline-block; margin: 10px 0 22px; font-family: var(--font-display); font-size: 12px; color: var(--muted); letter-spacing: 0.18em; text-transform: uppercase; }
 
 a { color: var(--neon-green); text-decoration: none; font-family: var(--font-display); font-weight: 700; }
 a:hover { text-decoration: underline; }
 
-/* Utility rules for dividers */
+.text-neon-blue,
+.text-neon-pink,
+.text-neon-purple,
+.text-neon-yellow {
+  font-weight: 700;
+  color: var(--ink);
+  padding: 0.08em 0.2em;
+  border-radius: 0.18em;
+}
+.text-neon-blue { background: rgba(0,240,255,0.18); }
+.text-neon-pink { background: rgba(255,0,204,0.18); }
+.text-neon-purple { background: rgba(182,120,255,0.18); }
+.text-neon-yellow { background: rgba(255,240,0,0.18); }
 .major { border: 0; border-top: 3px solid var(--ink); margin: 20px 0; }
 .minor { border: 0; border-top: 1.5px solid var(--ink); margin: 16px 0; }
 
