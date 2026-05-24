@@ -6,16 +6,12 @@
 .chyron .neon-blue { background: var(--neon-blue); color: #111; }
 .chyron .neon-pink { background: var(--neon-pink); color: #fff; }
 
-.ticker { position: fixed; left:0; right:0; top:0; background:#111; color:var(--neon-green); font-family:var(--font-display); font-weight:700; letter-spacing:0.18em; text-transform:uppercase; padding:6px 0; overflow:hidden; z-index:10000; }
-.ticker::before { content: ''; display:block; }
-.ticker div { display:inline-block; white-space:nowrap; }
-.ticker { display:flex; }
-.ticker > span { padding-right:40px; }
-.ticker { animation: ticker 20s linear infinite; }
-@keyframes ticker { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
-
-/* Since content is plain text, we duplicate it inside to form a loop visually */
-.ticker { will-change: transform; }
+.signal-status { display:flex; justify-content:flex-end; align-items:center; gap:12px; padding:10px 40px; font-family:var(--font-display); font-size:11px; font-weight:700; letter-spacing:0.18em; text-transform:uppercase; background:#111; color:var(--neon-green); border-bottom:1.5px solid var(--ink); }
+.signal-label { color:var(--neon-green); }
+.signal-bars { display:flex; gap:4px; }
+.signal-bars span { width:5px; height:8px; background:var(--neon-green); display:inline-block; }
+.signal-bars span:nth-child(5) { background:var(--muted); }
+.signal-value { color:var(--muted); }
 
 /* Active nav underline handled in layout.css */
 
@@ -34,3 +30,38 @@
 .neon-green { background: var(--neon-green); color: #111; }
 .neon-blue { background: var(--neon-blue); color: #111; }
 .neon-pink { background: var(--neon-pink); color: #fff; }
+
+body::before {
+  content: '';
+  position: fixed; inset: 0;
+  z-index: 9998; pointer-events: none;
+  opacity: 0.15;
+  transition: opacity 0.5s ease;
+  background-image:
+    linear-gradient(90deg, rgba(170,255,0,0.08) 33%, transparent 33%, transparent 66%, rgba(0,240,255,0.08) 66%),
+    linear-gradient(rgba(255,0,204,0.06) 33%, transparent 33%, transparent 66%, rgba(170,255,0,0.06) 66%);
+  background-size: 64px 64px, 64px 64px;
+  background-position: 0 0, 32px 32px;
+  animation: neon-square-shift 16s linear infinite;
+}
+
+@keyframes neon-square-shift {
+  from { background-position: 0 0, 32px 32px; }
+  to { background-position: 64px 64px, 96px 96px; }
+}
+
+body::after {
+  content: '';
+  position: fixed; inset: 0;
+  z-index: 9997; pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  background:
+    linear-gradient(rgba(0,240,255,0.06) 0px, rgba(0,240,255,0.06) 1px, transparent 1px),
+    linear-gradient(rgba(255,0,204,0.04) 0px, rgba(255,0,204,0.04) 1px, transparent 1px),
+    linear-gradient(rgba(170,255,0,0.03) 0px, rgba(170,255,0,0.03) 1px, transparent 1px);
+  background-size: 100% 100vh;
+}
+
+body.signal-active::before { opacity: 0.03; }
+body.signal-active::after  { opacity: 1; }

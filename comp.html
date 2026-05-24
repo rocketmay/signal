@@ -11,25 +11,9 @@
   <link rel="stylesheet" href="css/broadcast.css">
 </head>
 <body>
-  <header class="site-header small">
-    <div class="header-left">
-      <span class="site-title">Trigger Signal</span>
-    </div>
-    <div class="header-right">
-      <span class="chyron">
-        <span class="chyron-tag neon-pink">COMP</span>
-        <span class="chyron-body">Competition Notes</span>
-      </span>
-    </div>
-  </header>
+  <div id="header-include"></div>
 
-  <nav class="main-nav">
-    <a href="index.html" class="nav-item" data-page="index.html">INDEX</a>
-    <a href="comp.html" class="nav-item" data-page="comp.html">LATEST</a>
-    <a href="#" class="nav-item" data-page="archive.html">ARCHIVE</a>
-    <a href="info.html" class="nav-item" data-page="info.html">ABOUT</a>
-  </nav>
-
+  <div class="page-shell">
   <main class="content">
     <span class="chyron"><span class="chyron-tag neon-pink">COMP</span><span class="chyron-body">Competition</span></span>
     <h1>COMPETITION NOTES</h1>
@@ -52,10 +36,13 @@
       <a class="read-link" href="#">READ →</a>
     </article>
   </main>
+  </div>
 
   <div id="footer-include"></div>
 
   <script src="js/main.js"></script>
+  <script src="js/header.js"></script>
+  <script src="js/chyron.js"></script>
   <script src="js/footer.js"></script>
 </body>
 </html>
