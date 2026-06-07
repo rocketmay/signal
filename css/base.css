@@ -4,6 +4,7 @@
   --ink: #111111;
   --neon-green: #AAFF00;
   --neon-blue: #00F0FF;
+  --dark-blue: #0073b6;
   --neon-pink: #FF00CC;
   --neon-purple: #B678FF;
   --neon-yellow: #FFF000;
@@ -55,8 +56,8 @@ p { font-family: var(--font-body); font-size: 15px; line-height: 1.75; color: va
 .lead { font-size: 15px; color: var(--muted); font-family: var(--font-body); }
 .article-author { display: inline-block; margin: 10px 0 22px; font-family: var(--font-display); font-size: 12px; color: var(--muted); letter-spacing: 0.18em; text-transform: uppercase; }
 
-a { color: var(--neon-pink); text-decoration: none; font-family: var(--font-display); font-weight: 700; }
-a:hover { text-decoration: underline; }
+a { color: var(--dark-blue); text-decoration: underline; font-weight: 500; }
+a:hover { font-weight:600; text-decoration: none; }
 
 .text-neon-blue,
 .text-neon-pink,
@@ -79,3 +80,11 @@ a:hover { text-decoration: underline; }
 section { margin-bottom: 16px; }
 
 table { border-radius:1px; margin:8px; padding:8px; border-color:#525252; border-width:1.5px; border-style:solid; width:100%; }
+/* Center images inside article pages */
+main.content.article-page img {
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+  max-width: 100%;
+  height: auto;
+}
