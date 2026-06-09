@@ -89,7 +89,18 @@
 .icon-cell:hover .icon-frame::before, .icon-cell:hover .icon-frame::after { border-color: var(--neon-pink); }
 
 .content { max-width: 860px; padding: 40px 40px; margin: 0 auto; flex: 1; }
-.item { padding: 18px 0; }
+.item { padding: 24px 0; }
+
+/* Article list spacing: improves breathing for <ul>/<li> inside article items */
+.item ul,
+.content ul {
+  margin: 8px 0 0;
+  padding-left: 1.25rem;
+}
+.item ul li,
+.content ul li {
+  margin-bottom: 0.6rem;
+}
 .read-link { display:inline-flex; margin-top:0; font-family:var(--font-display); font-size:0.65em; font-weight:700; color:var(--neon-pink) !important; text-decoration:none; letter-spacing:0.08em; }
 .read-link:visited { color: var(--muted-purple) !important; }
 .item .read-link:hover { color: var(--neon-blue); }
@@ -206,7 +217,17 @@ h2 { font-size: clamp(16px, 4vw, 20px); }
   /* --- Article items on inner pages --- */
   .article-item,
   .item {
-    padding: 16px 0;
+    padding: 20px 0;
+  }
+
+  /* Tweak list spacing on narrow screens */
+  .item ul,
+  .content ul {
+    padding-left: 1rem;
+  }
+  .item ul li,
+  .content ul li {
+    margin-bottom: 0.8rem;
   }
 
 }
