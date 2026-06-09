@@ -65,3 +65,24 @@ body::after {
 
 body.signal-active::before { opacity: 0.03; }
 body.signal-active::after  { opacity: 1; }
+
+
+@media (max-width: 768px) {
+
+  /* Hide the diagonal accent rules — they clip awkwardly on narrow screens */
+  .diag-rule,
+  .diag-rule-2 {
+    display: none;
+  }
+
+  /* Chyron: allow wrapping on very small screens */
+  .chyron {
+    flex-wrap: wrap;
+  }
+
+  /* Ticker: slightly slower on mobile so it's readable */
+  .ticker-inner {
+    animation-duration: 28s;
+  }
+
+}
