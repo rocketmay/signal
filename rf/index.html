@@ -19,6 +19,7 @@
       <div>
         <h1>RF Link</h1>
         <p class="sub" id="status">Disconnected</p>
+        <p class="fw" id="fwValue">firmware —</p>
       </div>
     </div>
     <button type="button" id="connectBtn" class="btn primary">Connect</button>
@@ -71,7 +72,7 @@
     <ol>
       <li><strong>Android:</strong> Chrome. Open this page over HTTPS (GitHub Pages), tap <em>Add to Home Screen</em>, then Connect. Bluetooth only works in a secure context.</li>
       <li><strong>iPhone:</strong> Safari cannot do Web Bluetooth. Use the <em>Bluefy</em> browser, or nRF Connect for raw UART until a native app exists.</li>
-      <li>Flash Node B with firmware <code>v4.5-range</code>. Device name is <code>RF-Link-B</code>.</li>
+      <li>Flash Node B with firmware <code>v4.9-hello</code>. Device name is <code>RF-Link-B</code>. The page shows that tag after Connect.</li>
       <li>Carry the phone with Node B. Load this page once while you have data, so it still works in a field with no cell service.</li>
       <li>Tap Mark as you walk so RSSI and loss line up with distance notes. Export CSV when you are done.</li>
       <li>Add <code>?demo=1</code> to the URL to preview charts without a board.</li>

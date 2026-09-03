@@ -19,12 +19,14 @@ const els = {
   lossChart: document.getElementById('lossChart'),
   stripChart: document.getElementById('stripChart'),
   brandMark: document.querySelector('.brand-mark'),
+  fwValue: document.getElementById('fwValue'),
 };
 
 const samples = [];
 const markers = [];
 let device = null;
 let server = null;
+let txChar = null;
 let rxBuffer = '';
 let lastPacketAt = 0;
 let wakeLock = null;
@@ -42,6 +44,9 @@ function parseLine(line) {
   if (text.startsWith('{')) {
     try {
       const obj = JSON.parse(text);
+      if (obj.hello && obj.fw) {
+        return { hello: true, fw: obj.fw };
+      }
       if (typeof obj.rssi !== 'number' || typeof obj.c !== 'number') return null;
       return {
         counter: obj.c,
@@ -66,6 +71,21 @@ function parseLine(line) {
     drop: 0,
     fw: '',
   };
+}
+
+function setFirmware(fw) {
+  if (!fw) return;
+  els.fwValue.textContent = fw;
+}
+
+function ingest(parsed) {
+  if (!parsed) return;
+  if (parsed.fw) setFirmware(parsed.fw);
+  if (parsed.hello) {
+    setStatus(`Linked · ${parsed.fw}`, 'live');
+    return;
+  }
+  applySample(parsed);
 }
 
 function rssiClass(rssi) {
@@ -206,15 +226,11 @@ function onValueChanged(event) {
   const parts = rxBuffer.split('\n');
   rxBuffer = parts.pop() ?? '';
   for (const part of parts) {
-    const parsed = parseLine(part);
-    if (parsed) applySample(parsed);
+    ingest(parseLine(part));
   }
   if (rxBuffer.startsWith('{') && rxBuffer.trim().endsWith('}')) {
-    const parsed = parseLine(rxBuffer);
-    if (parsed) {
-      applySample(parsed);
-      rxBuffer = '';
-    }
+    ingest(parseLine(rxBuffer));
+    rxBuffer = '';
   }
 }
 
@@ -247,11 +263,20 @@ async function connect() {
       els.connectBtn.textContent = 'Connect';
     });
     setStatus('Connecting…', 'off');
+    lastPacketAt = 0;
+    rxBuffer = '';
+    els.staleWarn.classList.add('hidden');
     server = await device.gatt.connect();
     const service = await server.getPrimaryService(NUS_SERVICE);
-    const tx = await service.getCharacteristic(NUS_TX);
-    await tx.startNotifications();
-    tx.addEventListener('characteristicvaluechanged', onValueChanged);
+    // Keep a global reference. Chrome drops notifications if this is GC'd.
+    txChar = await service.getCharacteristic(NUS_TX);
+    await txChar.startNotifications();
+    txChar.addEventListener('characteristicvaluechanged', onValueChanged);
+    try {
+      ingest(parseLine(new TextDecoder().decode(await txChar.readValue())));
+    } catch {
+      // Read is optional; notifications still carry firmware in each packet.
+    }
     els.connectBtn.disabled = false;
     els.connectBtn.textContent = 'Disconnect';
     setStatus(`Linked · ${device.name || 'RF-Link-B'}`, 'live');

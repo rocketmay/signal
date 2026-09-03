@@ -76,6 +76,13 @@ h1 {
   font-size: 0.75rem;
 }
 
+.fw {
+  margin: 2px 0 0;
+  color: var(--rssi);
+  font-size: 0.75rem;
+  letter-spacing: 0.06em;
+}
+
 .btn {
   appearance: none;
   border: 1px solid var(--line);
