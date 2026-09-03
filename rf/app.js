@@ -2,7 +2,7 @@ const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const NUS_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 const STALE_MS = 12000;
 // Bump this and docs/sw.js CACHE together on every website upload.
-const WEB_VERSION = 6;
+const WEB_VERSION = 7;
 
 const els = {
   status: document.getElementById('status'),
@@ -23,6 +23,7 @@ const els = {
   brandMark: document.querySelector('.brand-mark'),
   fwValue: document.getElementById('fwValue'),
   webValue: document.getElementById('webValue'),
+  bleDebug: document.getElementById('bleDebug'),
 };
 
 const samples = [];
@@ -46,19 +47,24 @@ function lossPct(sample) {
 }
 
 function parseLine(line) {
-  const text = line.trim();
+  if (line == null) return null;
+  const text = String(line).replace(/\0/g, '').trim();
   if (!text || text === 'waiting for packets') return null;
 
-  if (text.startsWith('{')) {
+  const jsonStart = text.indexOf('{');
+  const jsonEnd = text.lastIndexOf('}');
+  if (jsonStart >= 0 && jsonEnd > jsonStart) {
     try {
-      const obj = JSON.parse(text);
+      const obj = JSON.parse(text.slice(jsonStart, jsonEnd + 1));
       if (obj.hello && obj.fw) {
         return { hello: true, fw: obj.fw };
       }
-      if (typeof obj.rssi !== 'number' || typeof obj.c !== 'number') return null;
+      if (typeof obj.c !== 'number') return null;
+      const rssi = typeof obj.rssi === 'number' ? obj.rssi : Number(obj.rssi);
+      if (!Number.isFinite(rssi)) return null;
       return {
         counter: obj.c,
-        rssi: obj.rssi,
+        rssi,
         nodeMs: obj.t ?? 0,
         rx: obj.rx ?? 0,
         drop: obj.drop ?? 0,
@@ -252,15 +258,19 @@ function stopPolling() {
   }
 }
 
+function setBleDebug(text) {
+  if (els.bleDebug) els.bleDebug.textContent = text;
+}
+
 async function pollCharacteristic() {
   if (gattBusy || !txChar || !device?.gatt?.connected) return;
-  if (lastNotifyAt && Date.now() - lastNotifyAt < 2500) return;
   gattBusy = true;
   try {
-    const raw = new TextDecoder().decode(await txChar.readValue());
+    const raw = new TextDecoder().decode(await txChar.readValue()).replace(/\0/g, '');
+    setBleDebug(raw.trim().slice(0, 140) || '(empty read)');
     ingest(parseLine(raw));
-  } catch {
-    // GATT busy or disconnected; the next tick retries.
+  } catch (err) {
+    setBleDebug(`read error: ${err.message || err}`);
   } finally {
     gattBusy = false;
   }
@@ -306,15 +316,11 @@ async function connect() {
     const service = await server.getPrimaryService(NUS_SERVICE);
     // Keep a global reference. Chrome drops notifications if this is GC'd.
     txChar = await service.getCharacteristic(NUS_TX);
-    await txChar.startNotifications();
-    txChar.addEventListener('characteristicvaluechanged', onValueChanged);
-    try {
-      ingest(parseLine(new TextDecoder().decode(await txChar.readValue())));
-    } catch {
-      // Read is optional; polling still picks up firmware and packets.
-    }
+    // Notifications die after the first ESP-NOW ack on this chip. Read the
+    // characteristic instead — firmware already setValue()s every packet.
     stopPolling();
     pollTimer = setInterval(pollCharacteristic, 1000);
+    await pollCharacteristic();
     els.connectBtn.disabled = false;
     els.connectBtn.textContent = 'Disconnect';
     setStatus(`Linked · ${device.name || 'RF-Link-B'}`, 'live');

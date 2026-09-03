@@ -76,11 +76,12 @@ h1 {
   font-size: 0.75rem;
 }
 
-.fw {
-  margin: 2px 0 0;
-  color: var(--rssi);
-  font-size: 0.75rem;
-  letter-spacing: 0.06em;
+.ble-debug {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.65rem;
+  line-height: 1.35;
+  word-break: break-all;
 }
 
 .btn {
