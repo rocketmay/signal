@@ -6,7 +6,7 @@ const GAP_AFTER_MS = 6000;
 const TRACE_MS = 250;
 const TRACE_WINDOW_MS = 90000;
 // Bump this and docs/sw.js CACHE together on every website upload.
-const WEB_VERSION = 9;
+const WEB_VERSION = 10;
 
 const els = {
   status: document.getElementById('status'),
@@ -34,6 +34,7 @@ const samples = [];
 const markers = [];
 const traces = [];
 const bleBreaks = [];
+const rfBreaks = [];
 let device = null;
 let server = null;
 let txChar = null;
@@ -41,6 +42,7 @@ let rxBuffer = '';
 let lastPacketAt = 0;
 let connectedAt = 0;
 let disconnectedAt = 0;
+let rfGapFrom = 0;
 let lastCounter = null;
 let lastNotifyAt = 0;
 let pollTimer = null;
@@ -163,28 +165,35 @@ function drawTimedChart(canvas, getY, color, yMin, yMax, height) {
   ctx.fillText(String(yMax), 4, padT + 8);
   ctx.fillText(String(yMin), 4, padT + plotH);
 
-  const visible = traces.filter((p) => p.t >= t0);
-  if (visible.length === 0) return;
-
   const xOf = (t) => padL + (plotW * (t - t0)) / TRACE_WINDOW_MS;
   const yOf = (v) => padT + plotH * (1 - (v - yMin) / span);
 
-  const openBreaks = disconnectedAt
-    ? bleBreaks.concat([{ from: disconnectedAt, to: now }])
-    : bleBreaks;
+  const paintBreaks = (gaps, fill, label) => {
+    gaps.forEach((gap) => {
+      const from = Math.max(gap.from, t0);
+      const to = Math.min(gap.to ?? now, now);
+      if (to <= from) return;
+      const x1 = xOf(from);
+      const x2 = xOf(to);
+      ctx.fillStyle = fill;
+      ctx.fillRect(x1, padT, Math.max(x2 - x1, 2), plotH);
+      ctx.fillStyle = label;
+      ctx.font = '11px ui-monospace, Consolas, monospace';
+      ctx.fillText(gap.tag, x1 + 4, padT + 12);
+    });
+  };
 
-  openBreaks.forEach((gap) => {
-    const from = Math.max(gap.from, t0);
-    const to = Math.min(gap.to ?? now, now);
-    if (to <= from) return;
-    const x1 = xOf(from);
-    const x2 = xOf(to);
-    ctx.fillStyle = '#ff6b3d28';
-    ctx.fillRect(x1, padT, Math.max(x2 - x1, 2), plotH);
-    ctx.fillStyle = '#ff6b3d';
-    ctx.font = '11px ui-monospace, Consolas, monospace';
-    ctx.fillText('BLE gap', x1 + 4, padT + 12);
-  });
+  const openRf = rfGapFrom
+    ? rfBreaks.concat([{ from: rfGapFrom, to: now, tag: 'RF gap' }])
+    : rfBreaks;
+  const openBle = disconnectedAt
+    ? bleBreaks.concat([{ from: disconnectedAt, to: now, tag: 'BLE gap' }])
+    : bleBreaks;
+  paintBreaks(openRf, '#ffcc4d28', '#ffcc4d');
+  paintBreaks(openBle, '#ff6b3d28', '#ff6b3d');
+
+  const visible = traces.filter((p) => p.t >= t0);
+  if (visible.length === 0) return;
 
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
@@ -258,20 +267,36 @@ function setRssiBlank() {
   els.rssiValue.className = 'rssi';
 }
 
+function closeRfGap() {
+  if (!rfGapFrom) return;
+  rfBreaks.push({ from: rfGapFrom, to: Date.now(), tag: 'RF gap' });
+  rfGapFrom = 0;
+}
+
 function tickTrace() {
   const now = Date.now();
   if (!device?.gatt?.connected) {
-    if (traces.length) {
+    if (traces.length || bleBreaks.length || rfBreaks.length || disconnectedAt) {
       pruneTraces(now);
       redraw();
     }
     return;
   }
   const last = samples.length ? samples[samples.length - 1] : null;
-  if (!last) {
+  if (!last || !lastPacketAt) {
     redraw();
     return;
   }
+  if (now - lastPacketAt >= GAP_AFTER_MS) {
+    if (!rfGapFrom) {
+      rfGapFrom = lastPacketAt;
+      setRssiBlank();
+    }
+    pruneTraces(now);
+    redraw();
+    return;
+  }
+  closeRfGap();
   pushTrace(last.rssi, lossPct(last), false);
   redraw();
 }
@@ -291,6 +316,7 @@ function applySample(sample) {
   };
   samples.push(row);
   lastPacketAt = row.phoneMs;
+  closeRfGap();
 
   els.rssiValue.textContent = String(sample.rssi);
   els.rssiValue.className = `rssi ${rssiClass(sample.rssi)}`;
@@ -380,7 +406,7 @@ async function connect() {
     device.addEventListener('gattserverdisconnected', onGattDisconnected);
     setStatus('Connecting…', 'off');
     if (disconnectedAt) {
-      bleBreaks.push({ from: disconnectedAt, to: Date.now() });
+      bleBreaks.push({ from: disconnectedAt, to: Date.now(), tag: 'BLE gap' });
       disconnectedAt = 0;
     }
     connectedAt = Date.now();
@@ -461,9 +487,11 @@ els.clearBtn.addEventListener('click', () => {
   markers.length = 0;
   traces.length = 0;
   bleBreaks.length = 0;
+  rfBreaks.length = 0;
   lastPacketAt = 0;
   lastCounter = null;
   disconnectedAt = 0;
+  rfGapFrom = 0;
   setRssiBlank();
   els.lossValue.textContent = '—';
   els.rxValue.textContent = '0';
