@@ -1,8 +1,12 @@
 const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const NUS_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 const STALE_MS = 12000;
+const RSSI_FLOOR = -100;
+const GAP_AFTER_MS = 6000;
+const TRACE_MS = 250;
+const TRACE_WINDOW_MS = 90000;
 // Bump this and docs/sw.js CACHE together on every website upload.
-const WEB_VERSION = 7;
+const WEB_VERSION = 8;
 
 const els = {
   status: document.getElementById('status'),
@@ -28,6 +32,7 @@ const els = {
 
 const samples = [];
 const markers = [];
+const traces = [];
 let device = null;
 let server = null;
 let txChar = null;
@@ -127,7 +132,7 @@ function resizeCanvas(canvas, height) {
   return { ctx, width, height: h };
 }
 
-function drawLineChart(canvas, values, color, yMin, yMax, height) {
+function drawTimedChart(canvas, getY, color, yMin, yMax, height) {
   const { ctx, width, height: h } = resizeCanvas(canvas, height);
   ctx.clearRect(0, 0, width, h);
   ctx.fillStyle = '#14150f';
@@ -139,6 +144,9 @@ function drawLineChart(canvas, values, color, yMin, yMax, height) {
   const padB = 18;
   const plotW = width - padL - padR;
   const plotH = h - padT - padB;
+  const now = Date.now();
+  const t0 = now - TRACE_WINDOW_MS;
+  const span = yMax - yMin || 1;
 
   ctx.strokeStyle = '#2c2f24';
   ctx.lineWidth = 1;
@@ -153,22 +161,27 @@ function drawLineChart(canvas, values, color, yMin, yMax, height) {
   ctx.fillText(String(yMax), 4, padT + 8);
   ctx.fillText(String(yMin), 4, padT + plotH);
 
-  if (values.length === 0) return;
+  const visible = traces.filter((p) => p.t >= t0);
+  if (visible.length === 0) return;
 
-  const span = Math.max(values.length - 1, 1);
+  const xOf = (t) => padL + (plotW * (t - t0)) / TRACE_WINDOW_MS;
+  const yOf = (v) => padT + plotH * (1 - (v - yMin) / span);
+
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   ctx.beginPath();
-  values.forEach((value, i) => {
-    const x = padL + (plotW * i) / span;
-    const y = padT + plotH * (1 - (value - yMin) / (yMax - yMin));
+  visible.forEach((p, i) => {
+    const x = xOf(p.t);
+    const y = yOf(getY(p));
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
   ctx.stroke();
 
   markers.forEach((marker) => {
-    const x = padL + (plotW * marker.index) / span;
+    const sample = samples[marker.index];
+    if (!sample || sample.phoneMs < t0) return;
+    const x = xOf(sample.phoneMs);
     ctx.strokeStyle = '#ffcc4d88';
     ctx.setLineDash([4, 3]);
     ctx.beginPath();
@@ -200,13 +213,42 @@ function drawStrip(canvas) {
 }
 
 function redraw() {
-  const rssiValues = samples.map((s) => s.rssi);
-  const lossValues = samples.map((s) => lossPct(s));
-  const rssiMin = Math.min(-100, ...rssiValues);
-  const rssiMax = Math.max(-20, ...rssiValues);
-  drawLineChart(els.rssiChart, rssiValues, '#b6ff4a', rssiMin, rssiMax, 168);
-  drawLineChart(els.lossChart, lossValues, '#ff6b3d', 0, Math.max(10, ...lossValues, 0), 168);
+  const rssiMin = RSSI_FLOOR;
+  const rssiMax = -20;
+  drawTimedChart(els.rssiChart, (p) => p.rssi, '#b6ff4a', rssiMin, rssiMax, 168);
+  const lossMax = Math.max(10, ...traces.map((p) => p.loss), 0);
+  drawTimedChart(els.lossChart, (p) => p.loss, '#ff6b3d', 0, lossMax, 168);
   drawStrip(els.stripChart);
+}
+
+function pruneTraces(now) {
+  const cutoff = now - TRACE_WINDOW_MS;
+  while (traces.length && traces[0].t < cutoff) traces.shift();
+}
+
+function pushTrace(rssi, loss, gap) {
+  const now = Date.now();
+  traces.push({ t: now, rssi, loss, gap });
+  pruneTraces(now);
+}
+
+function tickTrace() {
+  if (!device?.gatt?.connected) return;
+  const now = Date.now();
+  const last = samples.length ? samples[samples.length - 1] : null;
+  const age = lastPacketAt ? now - lastPacketAt : (connectedAt ? now - connectedAt : GAP_AFTER_MS);
+  if (last && age < GAP_AFTER_MS) {
+    pushTrace(last.rssi, lossPct(last), false);
+    redraw();
+    return;
+  }
+  const prev = traces.length ? traces[traces.length - 1].rssi : RSSI_FLOOR;
+  const rssi = Math.max(RSSI_FLOOR, prev - 25 * (TRACE_MS / 1000));
+  const loss = last ? Math.min(100, lossPct(last)) : 0;
+  pushTrace(rssi, loss, true);
+  els.rssiValue.textContent = String(Math.round(rssi));
+  els.rssiValue.className = 'rssi bad';
+  redraw();
 }
 
 function applySample(sample) {
@@ -233,6 +275,7 @@ function applySample(sample) {
   els.seqValue.textContent = `#${sample.counter}`;
   setStatus(sample.fw ? `Live · ${sample.fw}` : 'Live', 'live');
   els.staleWarn.classList.add('hidden');
+  pushTrace(sample.rssi, lossPct(sample), false);
   redraw();
 }
 
@@ -311,6 +354,7 @@ async function connect() {
     lastCounter = null;
     lastNotifyAt = 0;
     rxBuffer = '';
+    traces.length = 0;
     els.staleWarn.classList.add('hidden');
     server = await device.gatt.connect();
     const service = await server.getPrimaryService(NUS_SERVICE);
@@ -385,6 +429,9 @@ els.exportBtn.addEventListener('click', exportCsv);
 els.clearBtn.addEventListener('click', () => {
   samples.length = 0;
   markers.length = 0;
+  traces.length = 0;
+  lastPacketAt = 0;
+  lastCounter = null;
   els.rssiValue.textContent = '—';
   els.rssiValue.className = 'rssi';
   els.lossValue.textContent = '—';
@@ -395,6 +442,7 @@ els.clearBtn.addEventListener('click', () => {
 });
 
 window.addEventListener('resize', redraw);
+setInterval(tickTrace, TRACE_MS);
 setInterval(() => {
   if (device && !device.gatt?.connected) {
     setStatus('Disconnected', 'off');
