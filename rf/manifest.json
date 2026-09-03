@@ -1,0 +1,17 @@
+{
+  "name": "RF Link Range",
+  "short_name": "RF Link",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#10110e",
+  "theme_color": "#10110e",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
