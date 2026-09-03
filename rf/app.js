@@ -6,7 +6,7 @@ const GAP_AFTER_MS = 6000;
 const TRACE_MS = 250;
 const TRACE_WINDOW_MS = 90000;
 // Bump this and docs/sw.js CACHE together on every website upload.
-const WEB_VERSION = 8;
+const WEB_VERSION = 9;
 
 const els = {
   status: document.getElementById('status'),
@@ -33,12 +33,14 @@ const els = {
 const samples = [];
 const markers = [];
 const traces = [];
+const bleBreaks = [];
 let device = null;
 let server = null;
 let txChar = null;
 let rxBuffer = '';
 let lastPacketAt = 0;
 let connectedAt = 0;
+let disconnectedAt = 0;
 let lastCounter = null;
 let lastNotifyAt = 0;
 let pollTimer = null;
@@ -167,13 +169,32 @@ function drawTimedChart(canvas, getY, color, yMin, yMax, height) {
   const xOf = (t) => padL + (plotW * (t - t0)) / TRACE_WINDOW_MS;
   const yOf = (v) => padT + plotH * (1 - (v - yMin) / span);
 
+  const openBreaks = disconnectedAt
+    ? bleBreaks.concat([{ from: disconnectedAt, to: now }])
+    : bleBreaks;
+
+  openBreaks.forEach((gap) => {
+    const from = Math.max(gap.from, t0);
+    const to = Math.min(gap.to ?? now, now);
+    if (to <= from) return;
+    const x1 = xOf(from);
+    const x2 = xOf(to);
+    ctx.fillStyle = '#ff6b3d28';
+    ctx.fillRect(x1, padT, Math.max(x2 - x1, 2), plotH);
+    ctx.fillStyle = '#ff6b3d';
+    ctx.font = '11px ui-monospace, Consolas, monospace';
+    ctx.fillText('BLE gap', x1 + 4, padT + 12);
+  });
+
   ctx.strokeStyle = color;
   ctx.lineWidth = 2;
   ctx.beginPath();
   visible.forEach((p, i) => {
     const x = xOf(p.t);
     const y = yOf(getY(p));
-    if (i === 0) ctx.moveTo(x, y);
+    const prev = visible[i - 1];
+    const broken = !prev || p.t - prev.t > TRACE_MS * 4;
+    if (i === 0 || broken) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   });
   ctx.stroke();
@@ -232,22 +253,26 @@ function pushTrace(rssi, loss, gap) {
   pruneTraces(now);
 }
 
+function setRssiBlank() {
+  els.rssiValue.textContent = '—';
+  els.rssiValue.className = 'rssi';
+}
+
 function tickTrace() {
-  if (!device?.gatt?.connected) return;
   const now = Date.now();
+  if (!device?.gatt?.connected) {
+    if (traces.length) {
+      pruneTraces(now);
+      redraw();
+    }
+    return;
+  }
   const last = samples.length ? samples[samples.length - 1] : null;
-  const age = lastPacketAt ? now - lastPacketAt : (connectedAt ? now - connectedAt : GAP_AFTER_MS);
-  if (last && age < GAP_AFTER_MS) {
-    pushTrace(last.rssi, lossPct(last), false);
+  if (!last) {
     redraw();
     return;
   }
-  const prev = traces.length ? traces[traces.length - 1].rssi : RSSI_FLOOR;
-  const rssi = Math.max(RSSI_FLOOR, prev - 25 * (TRACE_MS / 1000));
-  const loss = last ? Math.min(100, lossPct(last)) : 0;
-  pushTrace(rssi, loss, true);
-  els.rssiValue.textContent = String(Math.round(rssi));
-  els.rssiValue.className = 'rssi bad';
+  pushTrace(last.rssi, lossPct(last), false);
   redraw();
 }
 
@@ -329,6 +354,15 @@ async function holdWakeLock() {
   }
 }
 
+function onGattDisconnected() {
+  stopPolling();
+  disconnectedAt = Date.now();
+  setRssiBlank();
+  setStatus('Disconnected', 'off');
+  els.connectBtn.disabled = false;
+  els.connectBtn.textContent = 'Connect';
+}
+
 async function connect() {
   if (!navigator.bluetooth) {
     setStatus('Web Bluetooth unavailable', 'off');
@@ -342,19 +376,15 @@ async function connect() {
       filters: [{ name: 'RF-Link-B' }, { namePrefix: 'RF-Link' }],
       optionalServices: [NUS_SERVICE],
     });
-    device.addEventListener('gattserverdisconnected', () => {
-      stopPolling();
-      setStatus('Disconnected', 'off');
-      els.connectBtn.disabled = false;
-      els.connectBtn.textContent = 'Connect';
-    });
+    device.removeEventListener('gattserverdisconnected', onGattDisconnected);
+    device.addEventListener('gattserverdisconnected', onGattDisconnected);
     setStatus('Connecting…', 'off');
-    lastPacketAt = 0;
+    if (disconnectedAt) {
+      bleBreaks.push({ from: disconnectedAt, to: Date.now() });
+      disconnectedAt = 0;
+    }
     connectedAt = Date.now();
-    lastCounter = null;
-    lastNotifyAt = 0;
     rxBuffer = '';
-    traces.length = 0;
     els.staleWarn.classList.add('hidden');
     server = await device.gatt.connect();
     const service = await server.getPrimaryService(NUS_SERVICE);
@@ -430,10 +460,11 @@ els.clearBtn.addEventListener('click', () => {
   samples.length = 0;
   markers.length = 0;
   traces.length = 0;
+  bleBreaks.length = 0;
   lastPacketAt = 0;
   lastCounter = null;
-  els.rssiValue.textContent = '—';
-  els.rssiValue.className = 'rssi';
+  disconnectedAt = 0;
+  setRssiBlank();
   els.lossValue.textContent = '—';
   els.rxValue.textContent = '0';
   els.dropValue.textContent = '0';
