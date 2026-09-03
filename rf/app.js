@@ -1,6 +1,8 @@
 const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const NUS_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 const STALE_MS = 12000;
+// Bump this and docs/sw.js CACHE together on every website upload.
+const WEB_VERSION = 5;
 
 const els = {
   status: document.getElementById('status'),
@@ -20,6 +22,7 @@ const els = {
   stripChart: document.getElementById('stripChart'),
   brandMark: document.querySelector('.brand-mark'),
   fwValue: document.getElementById('fwValue'),
+  webValue: document.getElementById('webValue'),
 };
 
 const samples = [];
@@ -79,7 +82,7 @@ function parseLine(line) {
 
 function setFirmware(fw) {
   if (!fw) return;
-  els.fwValue.textContent = fw;
+  els.fwValue.textContent = `firmware ${fw}`;
 }
 
 function ingest(parsed) {
@@ -397,6 +400,7 @@ setInterval(() => {
 }, 1000);
 
 redraw();
+els.webValue.textContent = `web ${WEB_VERSION}`;
 
 if (new URLSearchParams(location.search).has('demo')) {
   let counter = 0;
