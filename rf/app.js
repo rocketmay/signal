@@ -2,7 +2,7 @@ const NUS_SERVICE = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const NUS_TX = '6e400003-b5a3-f393-e0a9-e50e24dcca9e';
 const STALE_MS = 12000;
 // Bump this and docs/sw.js CACHE together on every website upload.
-const WEB_VERSION = 5;
+const WEB_VERSION = 6;
 
 const els = {
   status: document.getElementById('status'),
@@ -32,6 +32,7 @@ let server = null;
 let txChar = null;
 let rxBuffer = '';
 let lastPacketAt = 0;
+let connectedAt = 0;
 let lastCounter = null;
 let lastNotifyAt = 0;
 let pollTimer = null;
@@ -296,6 +297,7 @@ async function connect() {
     });
     setStatus('Connecting…', 'off');
     lastPacketAt = 0;
+    connectedAt = Date.now();
     lastCounter = null;
     lastNotifyAt = 0;
     rxBuffer = '';
@@ -392,15 +394,18 @@ setInterval(() => {
     setStatus('Disconnected', 'off');
     els.connectBtn.disabled = false;
     els.connectBtn.textContent = 'Connect';
+    connectedAt = 0;
   }
-  if (!lastPacketAt) return;
-  const stale = Date.now() - lastPacketAt > STALE_MS;
+  if (!device?.gatt?.connected) return;
+  const reference = lastPacketAt || connectedAt;
+  if (!reference) return;
+  const stale = Date.now() - reference > STALE_MS;
   els.staleWarn.classList.toggle('hidden', !stale);
-  if (stale && device?.gatt?.connected) setStatus('Stale link', 'stale');
+  if (stale) setStatus('Stale link', 'stale');
 }, 1000);
 
 redraw();
-els.webValue.textContent = `web ${WEB_VERSION}`;
+if (els.webValue) els.webValue.textContent = `web ${WEB_VERSION}`;
 
 if (new URLSearchParams(location.search).has('demo')) {
   let counter = 0;

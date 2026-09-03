@@ -1,9 +1,9 @@
-const CACHE = 'rf-link-range-v5';
+const CACHE = 'rf-link-range-v6';
 const ASSETS = [
   './',
   './index.html',
-  './app.js',
-  './styles.css',
+  './app.js?v=6',
+  './styles.css?v=6',
   './manifest.json',
   './icon.svg',
 ];
@@ -23,6 +23,12 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   event.respondWith(
-    caches.match(event.request).then((cached) => cached || fetch(event.request)),
+    fetch(event.request)
+      .then((response) => {
+        const copy = response.clone();
+        caches.open(CACHE).then((cache) => cache.put(event.request, copy));
+        return response;
+      })
+      .catch(() => caches.match(event.request)),
   );
 });
