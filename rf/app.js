@@ -326,6 +326,11 @@ els.clearBtn.addEventListener('click', () => {
 
 window.addEventListener('resize', redraw);
 setInterval(() => {
+  if (device && !device.gatt?.connected) {
+    setStatus('Disconnected', 'off');
+    els.connectBtn.disabled = false;
+    els.connectBtn.textContent = 'Connect';
+  }
   if (!lastPacketAt) return;
   const stale = Date.now() - lastPacketAt > STALE_MS;
   els.staleWarn.classList.toggle('hidden', !stale);
