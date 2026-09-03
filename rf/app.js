@@ -29,6 +29,10 @@ let server = null;
 let txChar = null;
 let rxBuffer = '';
 let lastPacketAt = 0;
+let lastCounter = null;
+let lastNotifyAt = 0;
+let pollTimer = null;
+let gattBusy = false;
 let wakeLock = null;
 
 function lossPct(sample) {
@@ -85,6 +89,8 @@ function ingest(parsed) {
     setStatus(`Linked · ${parsed.fw}`, 'live');
     return;
   }
+  if (lastCounter !== null && parsed.counter === lastCounter) return;
+  lastCounter = parsed.counter;
   applySample(parsed);
 }
 
@@ -221,6 +227,7 @@ function applySample(sample) {
 }
 
 function onValueChanged(event) {
+  lastNotifyAt = Date.now();
   const value = new TextDecoder().decode(event.target.value);
   rxBuffer += value;
   const parts = rxBuffer.split('\n');
@@ -231,6 +238,27 @@ function onValueChanged(event) {
   if (rxBuffer.startsWith('{') && rxBuffer.trim().endsWith('}')) {
     ingest(parseLine(rxBuffer));
     rxBuffer = '';
+  }
+}
+
+function stopPolling() {
+  if (pollTimer !== null) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+async function pollCharacteristic() {
+  if (gattBusy || !txChar || !device?.gatt?.connected) return;
+  if (lastNotifyAt && Date.now() - lastNotifyAt < 2500) return;
+  gattBusy = true;
+  try {
+    const raw = new TextDecoder().decode(await txChar.readValue());
+    ingest(parseLine(raw));
+  } catch {
+    // GATT busy or disconnected; the next tick retries.
+  } finally {
+    gattBusy = false;
   }
 }
 
@@ -258,12 +286,15 @@ async function connect() {
       optionalServices: [NUS_SERVICE],
     });
     device.addEventListener('gattserverdisconnected', () => {
+      stopPolling();
       setStatus('Disconnected', 'off');
       els.connectBtn.disabled = false;
       els.connectBtn.textContent = 'Connect';
     });
     setStatus('Connecting…', 'off');
     lastPacketAt = 0;
+    lastCounter = null;
+    lastNotifyAt = 0;
     rxBuffer = '';
     els.staleWarn.classList.add('hidden');
     server = await device.gatt.connect();
@@ -275,8 +306,10 @@ async function connect() {
     try {
       ingest(parseLine(new TextDecoder().decode(await txChar.readValue())));
     } catch {
-      // Read is optional; notifications still carry firmware in each packet.
+      // Read is optional; polling still picks up firmware and packets.
     }
+    stopPolling();
+    pollTimer = setInterval(pollCharacteristic, 1000);
     els.connectBtn.disabled = false;
     els.connectBtn.textContent = 'Disconnect';
     setStatus(`Linked · ${device.name || 'RF-Link-B'}`, 'live');
@@ -290,6 +323,7 @@ async function connect() {
 
 async function toggleConnection() {
   if (device?.gatt?.connected) {
+    stopPolling();
     device.gatt.disconnect();
     return;
   }

@@ -1,4 +1,4 @@
-const CACHE = 'rf-link-range-v3';
+const CACHE = 'rf-link-range-v4';
 const ASSETS = [
   './',
   './index.html',
