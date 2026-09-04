@@ -11,7 +11,7 @@ const DWELL_MIN_SAMPLES = 2;
 const ESTIMATE_MIN_POINTS = 8;
 const TRAIL_WEIGHT_VARIANCE = 8;
 // Bump this and docs/sw.js CACHE together on every website upload.
-const WEB_VERSION = 16;
+const WEB_VERSION = 17;
 
 const els = {
   status: document.getElementById('status'),
@@ -82,6 +82,7 @@ let wakeLock = null;
 let appMode = 'range';
 let huntActive = false;
 let lastFoxRssi = null;
+let lastTrendDelta = null;
 let watchId = null;
 let latestGeo = null;
 let dwellBucket = null;
@@ -385,7 +386,7 @@ function redrawMap() {
     : `${trail.length} trail points · need ${ESTIMATE_MIN_POINTS} for estimate`;
 }
 
-function updateFoxHud() {
+function updateFoxHud(trendDelta) {
   const last = samples.length ? samples[samples.length - 1] : null;
   if (els.trailCountValue) els.trailCountValue.textContent = String(trail.length);
   if (els.foxSeqValue) {
@@ -403,19 +404,20 @@ function updateFoxHud() {
 
   els.bandValue.textContent = `band ${bandLabel(last.rssi)}`;
 
-  if (lastFoxRssi == null) {
+  const delta = trendDelta !== undefined ? trendDelta : lastTrendDelta;
+  if (delta == null) {
     els.trendValue.textContent = 'Hunting…';
     els.trendValue.className = 'trend';
   } else {
-    const delta = last.rssi - lastFoxRssi;
+    const signed = delta > 0 ? `+${delta}` : `${delta}`;
     if (delta >= 2) {
-      els.trendValue.textContent = 'Warmer';
+      els.trendValue.textContent = `Warmer · ${signed} dB`;
       els.trendValue.className = 'trend warmer';
     } else if (delta <= -2) {
-      els.trendValue.textContent = 'Colder';
+      els.trendValue.textContent = `Colder · ${signed} dB`;
       els.trendValue.className = 'trend colder';
     } else {
-      els.trendValue.textContent = 'Same';
+      els.trendValue.textContent = `Same · ${signed} dB`;
       els.trendValue.className = 'trend same';
     }
   }
@@ -800,9 +802,11 @@ function applySample(sample) {
   pushTrace(sample.rssi, lossPct(sample), false);
 
   if (appMode === 'foxhunt') {
-    if (prevFox != null && sample.rssi - prevFox >= 2) vibrateWarmer();
+    const trendDelta = prevFox == null ? null : sample.rssi - prevFox;
+    if (trendDelta != null && trendDelta >= 2) vibrateWarmer();
     lastFoxRssi = sample.rssi;
-    updateFoxHud();
+    lastTrendDelta = trendDelta;
+    updateFoxHud(trendDelta);
     if (!demoMode) considerTrailSample(sample);
   } else {
     lastFoxRssi = sample.rssi;
@@ -1037,6 +1041,7 @@ function clearSession() {
   lastPacketAt = 0;
   lastCounter = null;
   lastFoxRssi = null;
+  lastTrendDelta = null;
   disconnectedAt = 0;
   rfGapFrom = 0;
   setRssiBlank();
