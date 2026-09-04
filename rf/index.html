@@ -10,7 +10,7 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon.svg">
-  <link rel="stylesheet" href="./styles.css?v=10">
+  <link rel="stylesheet" href="./styles.css?v=11">
 </head>
 <body>
   <header class="top">
@@ -19,10 +19,13 @@
       <div>
         <h1>RF Link</h1>
         <p class="sub" id="status">Disconnected</p>
-        <p class="fw"><span id="fwValue">firmware —</span> · <span id="webValue">web 10</span></p>
+        <p class="fw"><span id="fwValue">firmware —</span> · <span id="webValue">web 11</span></p>
       </div>
     </div>
-    <button type="button" id="connectBtn" class="btn primary">Connect</button>
+    <div class="controls">
+      <button type="button" id="pauseBtn" class="btn" disabled>Pause</button>
+      <button type="button" id="connectBtn" class="btn primary">Connect</button>
+    </div>
   </header>
 
   <section class="hero" id="hero">
@@ -80,6 +83,6 @@
     </ol>
   </details>
 
-  <script src="./app.js?v=10"></script>
+  <script src="./app.js?v=11"></script>
 </body>
 </html>

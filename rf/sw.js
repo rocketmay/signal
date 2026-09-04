@@ -1,9 +1,9 @@
-const CACHE = 'rf-link-range-v10';
+const CACHE = 'rf-link-range-v11';
 const ASSETS = [
   './',
   './index.html',
-  './app.js?v=10',
-  './styles.css?v=10',
+  './app.js?v=11',
+  './styles.css?v=11',
   './manifest.json',
   './icon.svg',
 ];

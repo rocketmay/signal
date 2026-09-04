@@ -6,11 +6,12 @@ const GAP_AFTER_MS = 6000;
 const TRACE_MS = 250;
 const TRACE_WINDOW_MS = 90000;
 // Bump this and docs/sw.js CACHE together on every website upload.
-const WEB_VERSION = 10;
+const WEB_VERSION = 11;
 
 const els = {
   status: document.getElementById('status'),
   connectBtn: document.getElementById('connectBtn'),
+  pauseBtn: document.getElementById('pauseBtn'),
   rssiValue: document.getElementById('rssiValue'),
   lossValue: document.getElementById('lossValue'),
   rxValue: document.getElementById('rxValue'),
@@ -47,6 +48,7 @@ let lastCounter = null;
 let lastNotifyAt = 0;
 let pollTimer = null;
 let gattBusy = false;
+let sessionLive = false;
 let wakeLock = null;
 
 function lossPct(sample) {
@@ -274,6 +276,7 @@ function closeRfGap() {
 }
 
 function tickTrace() {
+  if (!sessionLive) return;
   const now = Date.now();
   if (!device?.gatt?.connected) {
     if (traces.length || bleBreaks.length || rfBreaks.length || disconnectedAt) {
@@ -352,12 +355,44 @@ function stopPolling() {
   }
 }
 
+function setPauseUi() {
+  if (!els.pauseBtn) return;
+  const connected = !!device?.gatt?.connected;
+  els.pauseBtn.disabled = !connected;
+  els.pauseBtn.textContent = connected && !sessionLive ? 'Resume' : 'Pause';
+}
+
+async function startLive() {
+  sessionLive = true;
+  stopPolling();
+  pollTimer = setInterval(pollCharacteristic, 1000);
+  await pollCharacteristic();
+  setPauseUi();
+}
+
+function stopLive() {
+  sessionLive = false;
+  stopPolling();
+  setPauseUi();
+}
+
+async function togglePause() {
+  if (!device?.gatt?.connected) return;
+  if (sessionLive) {
+    stopLive();
+    setStatus('Paused', 'off');
+    return;
+  }
+  await startLive();
+  setStatus(`Live · ${device.name || 'RF-Link-B'}`, 'live');
+}
+
 function setBleDebug(text) {
   if (els.bleDebug) els.bleDebug.textContent = text;
 }
 
 async function pollCharacteristic() {
-  if (gattBusy || !txChar || !device?.gatt?.connected) return;
+  if (!sessionLive || gattBusy || !txChar || !device?.gatt?.connected) return;
   gattBusy = true;
   try {
     const raw = new TextDecoder().decode(await txChar.readValue()).replace(/\0/g, '');
@@ -381,7 +416,7 @@ async function holdWakeLock() {
 }
 
 function onGattDisconnected() {
-  stopPolling();
+  stopLive();
   disconnectedAt = Date.now();
   setRssiBlank();
   setStatus('Disconnected', 'off');
@@ -418,14 +453,13 @@ async function connect() {
     txChar = await service.getCharacteristic(NUS_TX);
     // Notifications die after the first ESP-NOW ack on this chip. Read the
     // characteristic instead — firmware already setValue()s every packet.
-    stopPolling();
-    pollTimer = setInterval(pollCharacteristic, 1000);
-    await pollCharacteristic();
+    await startLive();
     els.connectBtn.disabled = false;
     els.connectBtn.textContent = 'Disconnect';
     setStatus(`Linked · ${device.name || 'RF-Link-B'}`, 'live');
     await holdWakeLock();
   } catch (err) {
+    stopLive();
     setStatus(err.message || 'Connect failed', 'off');
     els.connectBtn.disabled = false;
     els.connectBtn.textContent = 'Connect';
@@ -434,7 +468,11 @@ async function connect() {
 
 async function toggleConnection() {
   if (device?.gatt?.connected) {
-    stopPolling();
+    stopLive();
+    if (els.pauseBtn) {
+      els.pauseBtn.disabled = true;
+      els.pauseBtn.textContent = 'Pause';
+    }
     device.gatt.disconnect();
     return;
   }
@@ -464,6 +502,7 @@ function exportCsv() {
 }
 
 els.connectBtn.addEventListener('click', toggleConnection);
+els.pauseBtn.addEventListener('click', togglePause);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible' && device?.gatt?.connected) {
     holdWakeLock();
@@ -509,7 +548,7 @@ setInterval(() => {
     els.connectBtn.textContent = 'Connect';
     connectedAt = 0;
   }
-  if (!device?.gatt?.connected) return;
+  if (!sessionLive || !device?.gatt?.connected) return;
   const reference = lastPacketAt || connectedAt;
   if (!reference) return;
   const stale = Date.now() - reference > STALE_MS;
