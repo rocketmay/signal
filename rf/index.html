@@ -10,7 +10,9 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon.svg">
-  <link rel="stylesheet" href="./styles.css?v=11">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <link rel="stylesheet" href="./styles.css?v=16">
 </head>
 <body>
   <header class="top">
@@ -19,7 +21,7 @@
       <div>
         <h1>RF Link</h1>
         <p class="sub" id="status">Disconnected</p>
-        <p class="fw"><span id="fwValue">firmware —</span> · <span id="webValue">web 11</span></p>
+        <p class="fw"><span id="fwValue">firmware —</span> · <span id="webValue">web 16</span></p>
       </div>
     </div>
     <div class="controls">
@@ -28,24 +30,51 @@
     </div>
   </header>
 
+  <nav class="mode-row" aria-label="App mode">
+    <button type="button" class="mode-btn active" data-mode="range" id="modeRange">Range</button>
+    <button type="button" class="mode-btn" data-mode="foxhunt" id="modeFoxhunt">Foxhunt</button>
+  </nav>
+
   <section class="hero" id="hero">
     <div class="rssi-block">
       <p class="label">RSSI</p>
       <p class="rssi" id="rssiValue">—</p>
       <p class="rssi-unit">dBm</p>
     </div>
-    <dl class="stats">
+    <dl class="stats" id="rangeStats">
       <div><dt>Loss</dt><dd id="lossValue">—</dd></div>
       <div><dt>RX</dt><dd id="rxValue">0</dd></div>
       <div><dt>Drop</dt><dd id="dropValue">0</dd></div>
       <div><dt>Seq</dt><dd id="seqValue">—</dd></div>
     </dl>
+    <div class="fox-panel hidden" id="foxPanel">
+      <p class="trend" id="trendValue">—</p>
+      <p class="band" id="bandValue">band —</p>
+      <dl class="stats fox-stats">
+        <div><dt>Bearing</dt><dd id="bearingValue">—</dd></div>
+        <div><dt>Est. dist</dt><dd id="estDistValue">—</dd></div>
+        <div><dt>Trail</dt><dd id="trailCountValue">0</dd></div>
+        <div><dt>Seq</dt><dd id="foxSeqValue">—</dd></div>
+      </dl>
+    </div>
+  </section>
+
+  <section class="hunt-bar hidden" id="huntBar">
+    <button type="button" id="huntBtn" class="btn primary">Start hunt</button>
+    <button type="button" id="foundBtn" class="btn" disabled>Found it</button>
+    <p class="hunt-status" id="huntStatus">Hunt idle — Start to record GPS trail</p>
   </section>
 
   <p class="stale hidden" id="staleWarn">No ESP-NOW packets — sender may be off</p>
   <p class="ble-debug" id="bleDebug">BLE read —</p>
 
-  <section class="charts">
+  <section class="map-wrap hidden" id="mapWrap">
+    <p class="label">Trail map</p>
+    <div id="map" role="img" aria-label="Foxhunt trail map"></div>
+    <p class="map-hint" id="mapHint">Start a hunt to drop GPS breadcrumbs colored by RSSI.</p>
+  </section>
+
+  <section class="charts" id="chartsSection">
     <figure>
       <figcaption>Signal strength</figcaption>
       <canvas id="rssiChart"></canvas>
@@ -56,7 +85,7 @@
     </figure>
   </section>
 
-  <section class="strip-wrap">
+  <section class="strip-wrap" id="stripSection">
     <p class="label">Packet strip</p>
     <canvas id="stripChart" height="36"></canvas>
   </section>
@@ -68,6 +97,7 @@
 
   <section class="actions">
     <button type="button" id="exportBtn" class="btn">Export CSV</button>
+    <button type="button" id="exportGeoBtn" class="btn hidden">GeoJSON</button>
     <button type="button" id="clearBtn" class="btn">Clear</button>
   </section>
 
@@ -76,13 +106,16 @@
     <ol>
       <li><strong>Android:</strong> Chrome. Open this page over HTTPS (GitHub Pages), tap <em>Add to Home Screen</em>, then Connect. Bluetooth only works in a secure context.</li>
       <li><strong>iPhone:</strong> Safari cannot do Web Bluetooth. Use the <em>Bluefy</em> browser, or nRF Connect for raw UART until a native app exists.</li>
-      <li>Flash Node B with firmware <code>v4.9-hello</code>. Device name is <code>RF-Link-B</code>. The page shows that tag after Connect.</li>
-      <li>Carry the phone with Node B. Load this page once while you have data, so it still works in a field with no cell service.</li>
-      <li>Tap Mark as you walk so RSSI and loss line up with distance notes. Export CSV when you are done.</li>
-      <li>Add <code>?demo=1</code> to the URL to preview charts without a board.</li>
+      <li>Flash Node B with firmware matching the tag shown after Connect. Device name is <code>RF-Link-B</code>.</li>
+      <li><strong>Range mode:</strong> charts + loss stats for walk tests. <strong>Foxhunt mode:</strong> warmer/colder HUD, map trail, and beacon estimate.</li>
+      <li>In Foxhunt, tap <em>Start hunt</em>, allow location, walk a loop around the ball. Estimate appears after enough good GPS points.</li>
+      <li>Tap <em>Found it</em> at the real ball to log ground truth for later calibration.</li>
+      <li>Add <code>?demo=1</code> to the URL to preview without a board (demo also fakes a short GPS trail).</li>
     </ol>
   </details>
 
-  <script src="./app.js?v=11"></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZsWNYgJHBElFkIKb04zvmF34Jn1s=" crossorigin=""></script>
+  <script src="./app.js?v=16"></script>
 </body>
 </html>
