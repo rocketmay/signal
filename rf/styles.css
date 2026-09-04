@@ -232,10 +232,17 @@ h1 {
 
 #map {
   height: min(52vh, 420px);
+  min-height: 220px;
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 12px;
   background: #14150f;
+  z-index: 0;
+}
+
+.leaflet-container {
+  background: #14150f;
+  font-family: inherit;
 }
 
 .map-hint {
@@ -294,7 +301,7 @@ dd {
   font-size: 0.8rem;
 }
 
-.hidden { display: none; }
+.hidden { display: none !important; }
 
 .charts {
   display: grid;

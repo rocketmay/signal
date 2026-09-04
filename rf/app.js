@@ -5,13 +5,12 @@ const RSSI_FLOOR = -100;
 const GAP_AFTER_MS = 6000;
 const TRACE_MS = 250;
 const TRACE_WINDOW_MS = 90000;
-const GPS_MAX_ACCURACY_M = 25;
-const DWELL_MS = 1500;
-const DWELL_MIN_SAMPLES = 2;
+const GPS_MAX_ACCURACY_M = 80;
+const TRAIL_MIN_MOVE_M = 6;
+const TRAIL_MIN_INTERVAL_MS = 2000;
 const ESTIMATE_MIN_POINTS = 8;
-const TRAIL_WEIGHT_VARIANCE = 8;
 // Bump this and docs/sw.js CACHE together on every website upload.
-const WEB_VERSION = 17;
+const WEB_VERSION = 18;
 
 const els = {
   status: document.getElementById('status'),
@@ -85,12 +84,16 @@ let lastFoxRssi = null;
 let lastTrendDelta = null;
 let watchId = null;
 let latestGeo = null;
-let dwellBucket = null;
 let map = null;
 let trailLayer = null;
 let estimateLayer = null;
 let truthLayer = null;
+let youLayer = null;
+let youMarker = null;
+let youAccuracy = null;
 let mapReady = false;
+let mapCentered = false;
+let mapInitTimer = null;
 let demoMode = false;
 
 function lossPct(sample) {
@@ -189,17 +192,54 @@ function setMode(mode) {
   els.stripSection.classList.toggle('hidden', appMode === 'foxhunt');
   els.exportGeoBtn.classList.toggle('hidden', appMode !== 'foxhunt');
   if (appMode === 'foxhunt') {
+    startGeoWatch();
     ensureMap();
     updateFoxHud();
     redrawMap();
   } else {
+    stopGeoWatch();
     redraw();
   }
 }
 
+function invalidateMapSoon() {
+  if (!map) return;
+  const run = () => {
+    try { map.invalidateSize(); } catch { /* map not ready */ }
+  };
+  requestAnimationFrame(() => {
+    run();
+    setTimeout(run, 80);
+    setTimeout(run, 400);
+  });
+}
+
 function ensureMap() {
-  if (mapReady || typeof L === 'undefined') return;
-  map = L.map('map', { zoomControl: true }).setView([49.28, -123.12], 15);
+  if (appMode !== 'foxhunt') return;
+  if (typeof L === 'undefined') {
+    if (els.mapHint) {
+      els.mapHint.textContent = 'Map library failed to load — reload over HTTPS.';
+    }
+    return;
+  }
+  const el = document.getElementById('map');
+  if (!el || els.mapWrap?.classList.contains('hidden') || el.clientHeight < 8) {
+    if (mapInitTimer) clearTimeout(mapInitTimer);
+    mapInitTimer = setTimeout(ensureMap, 80);
+    return;
+  }
+  if (mapReady) {
+    invalidateMapSoon();
+    updateYouMarker();
+    return;
+  }
+  map = L.map('map', { zoomControl: true });
+  if (latestGeo) {
+    map.setView([latestGeo.lat, latestGeo.lon], 17);
+    mapCentered = true;
+  } else {
+    map.setView([20, 0], 2);
+  }
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19,
     attribution: '&copy; OpenStreetMap',
@@ -207,8 +247,11 @@ function ensureMap() {
   trailLayer = L.layerGroup().addTo(map);
   estimateLayer = L.layerGroup().addTo(map);
   truthLayer = L.layerGroup().addTo(map);
+  youLayer = L.layerGroup().addTo(map);
   mapReady = true;
-  setTimeout(() => map.invalidateSize(), 50);
+  invalidateMapSoon();
+  updateYouMarker();
+  redrawMap();
 }
 
 function trailColor(rssi) {
@@ -316,18 +359,63 @@ function estimateBeacon() {
   estimate = { ...best, radiusM };
 }
 
+function gpsHint() {
+  if (!latestGeo) {
+    return huntActive
+      ? 'Waiting for a GPS fix… keep the phone outdoors with location on.'
+      : 'Allow location, then Start hunt. The blue dot is you.';
+  }
+  const acc = `GPS ±${latestGeo.accuracy.toFixed(0)} m`;
+  if (latestGeo.accuracy > GPS_MAX_ACCURACY_M) {
+    return `${acc} — waiting for a tighter fix before dropping crumbs.`;
+  }
+  if (!huntActive) return `${acc} — Start hunt to record the trail.`;
+  if (trail.length === 0) return `${acc} — walk; crumbs drop as you move.`;
+  return estimate
+    ? `${acc} · ${trail.length} points · estimate ~±${estimate.radiusM.toFixed(0)} m`
+    : `${acc} · ${trail.length} trail points · need ${ESTIMATE_MIN_POINTS} for estimate`;
+}
+
+function updateYouMarker() {
+  if (!mapReady || !latestGeo || typeof L === 'undefined' || !youLayer) return;
+  const latlng = [latestGeo.lat, latestGeo.lon];
+  const radius = Math.max(latestGeo.accuracy, 4);
+  if (!youMarker) {
+    youAccuracy = L.circle(latlng, {
+      radius,
+      color: '#7ec8ff',
+      weight: 1,
+      fillColor: '#7ec8ff',
+      fillOpacity: 0.14,
+    }).addTo(youLayer);
+    youMarker = L.circleMarker(latlng, {
+      radius: 8,
+      color: '#10110e',
+      weight: 2,
+      fillColor: '#7ec8ff',
+      fillOpacity: 1,
+    }).bindPopup('You').addTo(youLayer);
+  } else {
+    youAccuracy.setLatLng(latlng).setRadius(radius);
+    youMarker.setLatLng(latlng);
+  }
+  if (!mapCentered) {
+    map.setView(latlng, 17);
+    mapCentered = true;
+  } else if (trail.length === 0) {
+    map.panTo(latlng, { animate: false });
+  }
+}
+
 function redrawMap() {
   if (!mapReady) return;
   trailLayer.clearLayers();
   estimateLayer.clearLayers();
   truthLayer.clearLayers();
+  updateYouMarker();
+  els.mapHint.textContent = gpsHint();
 
-  if (trail.length === 0) {
-    els.mapHint.textContent = huntActive
-      ? 'Waiting for GPS + dwell-averaged RSSI points…'
-      : 'Start a hunt to drop GPS breadcrumbs colored by RSSI.';
-    return;
-  }
+  if (trail.length === 0) return;
 
   const latlngs = trail.map((p) => [p.lat, p.lon]);
   for (let i = 1; i < trail.length; i += 1) {
@@ -380,10 +468,9 @@ function redrawMap() {
   const bounds = L.latLngBounds(latlngs);
   if (estimate) bounds.extend([estimate.lat, estimate.lon]);
   if (groundTruth) bounds.extend([groundTruth.lat, groundTruth.lon]);
-  map.fitBounds(bounds.pad(0.25));
-  els.mapHint.textContent = estimate
-    ? `Estimate locked from ${trail.length} points · uncertainty ~${estimate.radiusM.toFixed(0)} m`
-    : `${trail.length} trail points · need ${ESTIMATE_MIN_POINTS} for estimate`;
+  if (latestGeo) bounds.extend([latestGeo.lat, latestGeo.lon]);
+  map.fitBounds(bounds.pad(0.25), { maxZoom: 18, animate: false });
+  els.mapHint.textContent = gpsHint();
 }
 
 function updateFoxHud(trendDelta) {
@@ -451,19 +538,37 @@ function onGeo(position) {
     accuracy: position.coords.accuracy || 999,
     t: Date.now(),
   };
+  if (els.huntStatus) els.huntStatus.textContent = gpsHint();
+  updateYouMarker();
+  if (huntActive && lastFoxRssi != null) {
+    maybeCommitTrail(lastFoxRssi, lastCounter);
+  }
+}
+
+function geoError(err) {
+  const denied = err && err.code === 1;
+  if (!els.huntStatus) return;
+  if (denied) {
+    els.huntStatus.textContent = 'Location permission denied — enable it for this site.';
+    return;
+  }
+  if (!latestGeo) {
+    els.huntStatus.textContent = `Waiting for GPS… ${err?.message || ''}`.trim();
+  }
 }
 
 function startGeoWatch() {
-  if (watchId != null || !navigator.geolocation) return;
-  watchId = navigator.geolocation.watchPosition(onGeo, () => {
-    if (els.huntStatus) {
-      els.huntStatus.textContent = 'Location error — enable GPS and retry Start hunt';
-    }
-  }, {
-    enableHighAccuracy: true,
-    maximumAge: 1000,
-    timeout: 15000,
-  });
+  if (!navigator.geolocation) {
+    if (els.huntStatus) els.huntStatus.textContent = 'Geolocation unavailable in this browser';
+    return;
+  }
+  if (watchId != null) return;
+  if (els.huntStatus && !latestGeo) {
+    els.huntStatus.textContent = 'Waiting for GPS fix…';
+  }
+  const opts = { enableHighAccuracy: true, maximumAge: 1000 };
+  navigator.geolocation.getCurrentPosition(onGeo, geoError, opts);
+  watchId = navigator.geolocation.watchPosition(onGeo, geoError, opts);
 }
 
 function stopGeoWatch() {
@@ -473,10 +578,29 @@ function stopGeoWatch() {
   watchId = null;
 }
 
-function variance(values) {
-  if (values.length < 2) return 0;
-  const mean = values.reduce((a, b) => a + b, 0) / values.length;
-  return values.reduce((a, b) => a + (b - mean) ** 2, 0) / values.length;
+function maybeCommitTrail(rssi, counter) {
+  if (!huntActive || appMode !== 'foxhunt' || !latestGeo) return;
+  if (latestGeo.accuracy > GPS_MAX_ACCURACY_M) {
+    if (els.huntStatus) els.huntStatus.textContent = gpsHint();
+    return;
+  }
+  const now = Date.now();
+  const last = trail.length ? trail[trail.length - 1] : null;
+  const moved = last ? haversineM(last, latestGeo) : Infinity;
+  const age = last ? now - last.t : Infinity;
+  if (last && moved < 2) return;
+  if (last && moved < TRAIL_MIN_MOVE_M && age < TRAIL_MIN_INTERVAL_MS) return;
+
+  commitTrailPoint({
+    t: now,
+    lat: latestGeo.lat,
+    lon: latestGeo.lon,
+    accuracy: latestGeo.accuracy,
+    rssi,
+    counter,
+    weight: 1 / (1 + latestGeo.accuracy / 10),
+    variance: 0,
+  });
 }
 
 function commitTrailPoint(point) {
@@ -484,78 +608,25 @@ function commitTrailPoint(point) {
   estimateBeacon();
   updateFoxHud();
   redrawMap();
-  if (els.huntStatus) {
-    els.huntStatus.textContent = huntActive
-      ? `Hunting · ${trail.length} points${estimate ? ' · estimate live' : ''}`
-      : els.huntStatus.textContent;
-  }
+  if (els.huntStatus) els.huntStatus.textContent = gpsHint();
 }
 
 function considerTrailSample(sample) {
-  if (!huntActive || appMode !== 'foxhunt') return;
-  if (!latestGeo || latestGeo.accuracy > GPS_MAX_ACCURACY_M) return;
-
-  const now = Date.now();
-  if (!dwellBucket) {
-    dwellBucket = {
-      startedAt: now,
-      rssi: [sample.rssi],
-      counter: sample.counter,
-      geo: { ...latestGeo },
-    };
-    return;
-  }
-
-  const moved = haversineM(dwellBucket.geo, latestGeo);
-  if (moved > Math.max(latestGeo.accuracy, 8)) {
-    dwellBucket = {
-      startedAt: now,
-      rssi: [sample.rssi],
-      counter: sample.counter,
-      geo: { ...latestGeo },
-    };
-    return;
-  }
-
-  dwellBucket.rssi.push(sample.rssi);
-  dwellBucket.counter = sample.counter;
-  dwellBucket.geo = { ...latestGeo };
-
-  const elapsed = now - dwellBucket.startedAt;
-  if (elapsed < DWELL_MS || dwellBucket.rssi.length < DWELL_MIN_SAMPLES) return;
-
-  const meanRssi = dwellBucket.rssi.reduce((a, b) => a + b, 0) / dwellBucket.rssi.length;
-  const rssiVar = variance(dwellBucket.rssi);
-  const weight = 1 / (1 + dwellBucket.geo.accuracy / 10 + rssiVar / TRAIL_WEIGHT_VARIANCE);
-
-  commitTrailPoint({
-    t: now,
-    lat: dwellBucket.geo.lat,
-    lon: dwellBucket.geo.lon,
-    accuracy: dwellBucket.geo.accuracy,
-    rssi: meanRssi,
-    counter: dwellBucket.counter,
-    weight,
-    variance: rssiVar,
-  });
-
-  dwellBucket = null;
+  maybeCommitTrail(sample.rssi, sample.counter);
 }
 
 function setHuntUi() {
   if (!els.huntBtn) return;
   els.huntBtn.textContent = huntActive ? 'Stop hunt' : 'Start hunt';
-  els.foundBtn.disabled = !huntActive && trail.length === 0;
-  if (!huntActive && trail.length === 0) {
-    els.huntStatus.textContent = 'Hunt idle — Start to record GPS trail';
+  els.foundBtn.disabled = !huntActive && trail.length === 0 && !latestGeo;
+  if (!huntActive && trail.length === 0 && els.huntStatus) {
+    els.huntStatus.textContent = gpsHint();
   }
 }
 
 function toggleHunt() {
   if (huntActive) {
     huntActive = false;
-    dwellBucket = null;
-    stopGeoWatch();
     els.huntStatus.textContent = `Hunt paused · ${trail.length} points saved`;
     setHuntUi();
     return;
@@ -565,9 +636,8 @@ function toggleHunt() {
     return;
   }
   huntActive = true;
-  dwellBucket = null;
   startGeoWatch();
-  els.huntStatus.textContent = 'Hunting — walk a loop; stand still briefly for each crumb';
+  els.huntStatus.textContent = gpsHint();
   setHuntUi();
   ensureMap();
 }
@@ -1037,13 +1107,16 @@ function clearSession() {
   trail.length = 0;
   estimate = null;
   groundTruth = null;
-  dwellBucket = null;
   lastPacketAt = 0;
   lastCounter = null;
   lastFoxRssi = null;
   lastTrendDelta = null;
   disconnectedAt = 0;
   rfGapFrom = 0;
+  mapCentered = false;
+  if (youLayer) youLayer.clearLayers();
+  youMarker = null;
+  youAccuracy = null;
   setRssiBlank();
   els.lossValue.textContent = '—';
   els.rxValue.textContent = '0';

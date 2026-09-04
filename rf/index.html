@@ -10,9 +10,8 @@
   <link rel="manifest" href="./manifest.json">
   <link rel="icon" href="./icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="./icon.svg">
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
-  <link rel="stylesheet" href="./styles.css?v=17">
+  <link rel="stylesheet" href="./leaflet/leaflet.css">
+  <link rel="stylesheet" href="./styles.css?v=18">
 </head>
 <body>
   <header class="top">
@@ -21,7 +20,7 @@
       <div>
         <h1>RF Link</h1>
         <p class="sub" id="status">Disconnected</p>
-        <p class="fw"><span id="fwValue">firmware —</span> · <span id="webValue">web 17</span></p>
+        <p class="fw"><span id="fwValue">firmware —</span> · <span id="webValue">web 18</span></p>
       </div>
     </div>
     <div class="controls">
@@ -108,14 +107,13 @@
       <li><strong>iPhone:</strong> Safari cannot do Web Bluetooth. Use the <em>Bluefy</em> browser, or nRF Connect for raw UART until a native app exists.</li>
       <li>Flash Node B with firmware matching the tag shown after Connect. Device name is <code>RF-Link-B</code>.</li>
       <li><strong>Range mode:</strong> charts + loss stats for walk tests. <strong>Foxhunt mode:</strong> warmer/colder HUD, map trail, and beacon estimate.</li>
-      <li>In Foxhunt, tap <em>Start hunt</em>, allow location, walk a loop around the ball. Estimate appears after enough good GPS points.</li>
+      <li>In Foxhunt, allow location. The blue dot is you. Tap <em>Start hunt</em> and walk — crumbs drop as you move. Estimate appears after enough points.</li>
       <li>Tap <em>Found it</em> at the real ball to log ground truth for later calibration.</li>
       <li>Add <code>?demo=1</code> to the URL to preview without a board (demo also fakes a short GPS trail).</li>
     </ol>
   </details>
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZsWNYgJHBElFkIKb04zvmF34Jn1s=" crossorigin=""></script>
-  <script src="./app.js?v=17"></script>
+  <script src="./leaflet/leaflet.js"></script>
+  <script src="./app.js?v=18"></script>
 </body>
 </html>
